@@ -20,6 +20,11 @@ class RNN(object):
     def softmax(self, x):
         return np.exp(x) / np.sum(np.exp(x), axis=0)
 
+    def loss(self, expected, targets):
+        exp_expected = np.exp(expected)
+        normalized = exp_expected / np.sum(exp_expected)
+        return -np.log(normalized[np.argmax(targets)])
+
     def forward_step(self, X, i):
         # Compute hidden state
         self.h[i] = np.tanh(np.dot(X, self.WX) + np.dot(self.h[i - 1], self.WH))
@@ -28,6 +33,7 @@ class RNN(object):
 
     def step(self):
         outputs = []
+        loss = 0
         for i in xrange(self.T):
             X = self.data[i]
             normalized_input = np.zeros(self.vocab_size)
@@ -36,7 +42,9 @@ class RNN(object):
             normalized_output = np.zeros(self.vocab_size)
             normalized_output[self.gram_to_vocab[X] + 1] = 1
 
-            outputs.append(self.forward_step(normalized_input, i))
+            prediction = self.forward_step(normalized_input, i)
+            outputs.append(prediction)
+            loss += self.loss(prediction, normalized_output)
 
     def train(self, data, ngrams=7):
         # Split Data by ngrams
@@ -69,7 +77,6 @@ class RNN(object):
         # Generate sample input
         sample_input = np.zeros((self.vocab_size))
         sample_input[0] = 1
-
         # Index of current hidden state
         h_idx = 0
 
@@ -81,10 +88,8 @@ class RNN(object):
 
         for i in range(n):
             # Move Inputs forward and Get Output
-            sample_output = self.forward_step(sample_input, h_idx)
-            vocab_idx = np.argmax(sample_output)
-            sample_input = np.zeros((self.vocab_size))
-            sample_input[vocab_idx] = 1
+            sample_input = self.forward_step(sample_input, h_idx)
+            vocab_idx = np.argmax(sample_input)
             sample += self.vocab[vocab_idx]
             h_idx += 1
 
@@ -95,4 +100,4 @@ bot = RNN()
 bot.train(open("data.txt").read())
 for i in xrange(epochs):
     if(i % 100 == 0):
-        print bot.sample(1000)
+        print bot.sample()
