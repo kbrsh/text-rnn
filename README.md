@@ -1,2 +1,2 @@
 # gram-rnn
-RNN to generate text from ngrams
+RNN to generate text from chunks of text
