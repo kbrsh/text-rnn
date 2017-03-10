@@ -8,16 +8,19 @@ def unique(seq):
 class RNN(object):
     def __init__(self):
         # Hyperparameters
+
+        # Number of Hidden Layers in Network
         self.hiddenLayers = 100
 
+        # Learning Rate
         self.learning_rate = 1e-0
 
+        # Weights for Hidden Layer to Hidden Layer
         self.WH = np.random.randn(self.hiddenLayers, self.hiddenLayers)
 
+        # Initial Hidden State
         self.h = {}
         self.h[-1] = np.zeros((self.hiddenLayers, 1))
-
-        self.o = {}
 
     def softmax(self, x):
         return np.exp(x) / np.sum(np.exp(x))
@@ -118,6 +121,7 @@ class RNN(object):
         # Generate sample input
         sample_input = np.zeros((self.vocab_size, 1))
         sample_input[0, 0] = 1
+
         # Index of current hidden state
         h_idx = 0
 
