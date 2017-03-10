@@ -42,21 +42,20 @@ class RNN(object):
 
         # Forward propagation
         for i in xrange(self.T):
-            X = self.data[i]
             # Encode In One hot Encoding
             hot_input = np.zeros((self.vocab_size, 1))
-            hot_input[self.gram_to_vocab[X]][0] = 1
+            hot_input[self.gram_to_vocab[self.data[i]]][0] = 1
             hot_inputs.append(hot_input)
 
+            target_idxs.append(self.gram_to_vocab[self.data[i + 1]])
             hot_output = np.zeros((self.vocab_size, 1))
-            hot_output[self.gram_to_vocab[X] + 1][0] = 1
+            hot_output[target_idxs[i]][0] = 1
 
             # Make Prediction (Compute Hidden State)
             prediction = self.forward_step(hot_input, i)
             outputs.append(prediction)
 
             # Compute Loss
-            target_idxs.append(self.gram_to_vocab[X] + 1)
             output_loss = self.loss(prediction, target_idxs[i])
             loss += output_loss
 
@@ -103,7 +102,7 @@ class RNN(object):
 
         # Timesteps to Move through Network
         data_len = len(self.data) - 1
-        self.T = data_len - 1 if data_len < 10 else 10
+        self.T = data_len
 
         # Initialize Weights
         self.WX = np.random.randn(self.hiddenLayers, self.vocab_size) # Input to Hidden
@@ -134,7 +133,7 @@ class RNN(object):
             h_idx += 1
 
         return sample
-
+    
 iterations = 1000
 bot = RNN()
 bot.train(open("data.txt").read())
