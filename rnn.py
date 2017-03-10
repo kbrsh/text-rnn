@@ -42,21 +42,21 @@ class RNN(object):
 
         # Forward propagation
         for i in xrange(self.T):
-            X = self.data[i]
             # Encode In One hot Encoding
             hot_input = np.zeros((self.vocab_size, 1))
-            hot_input[self.gram_to_vocab[X]][0] = 1
+            hot_input[self.gram_to_vocab[self.data[i]]][0] = 1
             hot_inputs.append(hot_input)
 
             hot_output = np.zeros((self.vocab_size, 1))
-            hot_output[self.gram_to_vocab[X] + 1][0] = 1
+            target_idx = self.gram_to_vocab[self.data[i + 1]]
+            hot_output[target_idx][0] = 1
+            target_idxs.append(target_idx)
 
             # Make Prediction (Compute Hidden State)
             prediction = self.forward_step(hot_input, i)
             outputs.append(prediction)
 
             # Compute Loss
-            target_idxs.append(self.gram_to_vocab[X] + 1)
             output_loss = self.loss(prediction, target_idxs[i])
             loss += output_loss
 
