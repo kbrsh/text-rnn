@@ -10,41 +10,81 @@ class RNN(object):
         # Hyperparameters
         self.hiddenLayers = 100
 
+        self.learning_rate = 1e-0
+
         self.WH = np.random.randn(self.hiddenLayers, self.hiddenLayers)
 
         self.h = {}
-        self.h[-1] = np.zeros((self.hiddenLayers))
+        self.h[-1] = np.zeros((self.hiddenLayers, 1))
 
         self.o = {}
 
     def softmax(self, x):
-        return np.exp(x) / np.sum(np.exp(x), axis=0)
+        return np.exp(x) / np.sum(np.exp(x))
 
-    def loss(self, expected, targets):
-        exp_expected = np.exp(expected)
-        normalized = exp_expected / np.sum(exp_expected)
-        return -np.log(normalized[np.argmax(targets)])
+    def loss(self, prediction, targets):
+        return -np.log(prediction[targets, 0])
 
     def forward_step(self, X, i):
         # Compute hidden state
-        self.h[i] = np.tanh(np.dot(X, self.WX) + np.dot(self.h[i - 1], self.WH))
+        self.h[i] = np.tanh(np.dot(self.WX, X) + np.dot(self.WH, self.h[i - 1]))
         # Compute output
-        return self.softmax(np.dot(self.h[i], self.WY))
+        return self.softmax(np.dot(self.WY, self.h[i]))
 
     def step(self):
+        hot_inputs = []
         outputs = []
+        output_probs = []
+        target_idxs = []
         loss = 0
+
+        # Forward propagation
         for i in xrange(self.T):
             X = self.data[i]
-            normalized_input = np.zeros(self.vocab_size)
-            normalized_input[self.gram_to_vocab[X]] = 1
+            # Encode In One hot Encoding
+            hot_input = np.zeros((self.vocab_size, 1))
+            hot_input[self.gram_to_vocab[X]][0] = 1
+            hot_inputs.append(hot_input)
 
-            normalized_output = np.zeros(self.vocab_size)
-            normalized_output[self.gram_to_vocab[X] + 1] = 1
+            hot_output = np.zeros((self.vocab_size, 1))
+            hot_output[self.gram_to_vocab[X] + 1][0] = 1
 
-            prediction = self.forward_step(normalized_input, i)
+            # Make Prediction (Compute Hidden State)
+            prediction = self.forward_step(hot_input, i)
             outputs.append(prediction)
-            loss += self.loss(prediction, normalized_output)
+
+            # Compute Loss
+            target_idxs.append(self.gram_to_vocab[X] + 1)
+            output_loss = self.loss(prediction, target_idxs[i])
+            loss += output_loss
+
+
+        # Back Propagation Through Time (BPTT)
+        dW = np.zeros_like(self.WX)
+        dW2 = np.zeros_like(self.WY)
+        dWh = np.zeros_like(self.WH)
+        for i in reversed(xrange(self.T)):
+            # Compute gradient for outputs
+            d_output = np.copy(outputs[i])
+            d_output[target_idxs[i]] -= 1
+
+            # Compute Gradient for Hidden to Output
+            dW2 += np.dot(d_output, self.h[i].T)
+
+            # Compute Gradient for Hidden to Hidden
+            dhidden = np.dot(self.WY.T, d_output)
+            dhidden = (1 - self.h[i] * self.h[i]) * dhidden
+            dWh += np.dot(dhidden, self.h[i - 1].T)
+
+            # Compute Gradient for Hidden to Output
+            dW += np.dot(dhidden, hot_inputs[i].T)
+
+        # Perform Parameter Update
+        self.WX += -self.learning_rate * dW
+        self.WY += -self.learning_rate * dW2
+        self.WH += -self.learning_rate * dWh
+
+        return loss
 
     def train(self, data, ngrams=7):
         # Split Data by ngrams
@@ -60,11 +100,12 @@ class RNN(object):
         self.vocab_size = len(self.vocab)
 
         # Timesteps to Move through Network
-        self.T = len(self.data) - 1
+        data_len = len(self.data) - 1
+        self.T = data_len - 1 if data_len < 10 else 10
 
         # Initialize Weights
-        self.WX = np.random.randn(self.vocab_size, self.hiddenLayers) # Input to Hidden
-        self.WY = np.random.randn(self.hiddenLayers, self.vocab_size) # Hidden to Output
+        self.WX = np.random.randn(self.hiddenLayers, self.vocab_size) # Input to Hidden
+        self.WY = np.random.randn(self.vocab_size, self.hiddenLayers) # Hidden to Output
 
 
     def sample(self, n=100):
@@ -75,14 +116,10 @@ class RNN(object):
         seed = 0
 
         # Generate sample input
-        sample_input = np.zeros((self.vocab_size))
-        sample_input[0] = 1
+        sample_input = np.zeros((self.vocab_size, 1))
+        sample_input[0, 0] = 1
         # Index of current hidden state
         h_idx = 0
-
-        # Reset Hidden State
-        self.h = {}
-        self.h[-1] = np.zeros((self.hiddenLayers))
 
         sample += self.vocab[0]
 
@@ -95,9 +132,11 @@ class RNN(object):
 
         return sample
 
-epochs = 1
+iterations = 1000
 bot = RNN()
 bot.train(open("data.txt").read())
-for i in xrange(epochs):
+for i in xrange(iterations):
+    loss = bot.step()
     if(i % 100 == 0):
+        print '======= Iteration: ' + str(i) + '  Loss: ' + str(loss) + ' ======='
         print bot.sample()
