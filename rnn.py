@@ -37,7 +37,6 @@ class RNN(object):
     def step(self):
         hot_inputs = []
         outputs = []
-        output_probs = []
         target_idxs = []
         loss = 0
 
