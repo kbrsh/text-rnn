@@ -42,20 +42,21 @@ class RNN(object):
 
         # Forward propagation
         for i in xrange(self.T):
+            X = self.data[i]
             # Encode In One hot Encoding
             hot_input = np.zeros((self.vocab_size, 1))
-            hot_input[self.gram_to_vocab[self.data[i]]][0] = 1
+            hot_input[self.gram_to_vocab[X]][0] = 1
             hot_inputs.append(hot_input)
 
-            target_idxs.append(self.gram_to_vocab[self.data[i + 1]])
             hot_output = np.zeros((self.vocab_size, 1))
-            hot_output[target_idxs[i]][0] = 1
+            hot_output[self.gram_to_vocab[X] + 1][0] = 1
 
             # Make Prediction (Compute Hidden State)
             prediction = self.forward_step(hot_input, i)
             outputs.append(prediction)
 
             # Compute Loss
+            target_idxs.append(self.gram_to_vocab[X] + 1)
             output_loss = self.loss(prediction, target_idxs[i])
             loss += output_loss
 
@@ -118,22 +119,24 @@ class RNN(object):
 
         # Generate sample input
         sample_input = np.zeros((self.vocab_size, 1))
-        sample_input[0, 0] = 1
+        sample_input[seed, 0] = 1
 
         # Index of current hidden state
         h_idx = 0
 
-        sample += self.vocab[0]
+        sample += self.vocab[seed]
 
         for i in range(n):
             # Move Inputs forward and Get Output
-            sample_input = self.forward_step(sample_input, h_idx)
-            vocab_idx = np.argmax(sample_input)
+            sample_output = self.forward_step(sample_input, h_idx)
+            vocab_idx = np.argmax(sample_output)
+            sample_input = np.zeros((self.vocab_size, 1))
+            sample_input[vocab_idx, 0] = 1
             sample += self.vocab[vocab_idx]
             h_idx += 1
 
         return sample
-    
+
 iterations = 1000
 bot = RNN()
 bot.train(open("data.txt").read())
