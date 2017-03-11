@@ -14,14 +14,14 @@ class RNN(object):
         self.hiddenLayers = 100
 
         # Learning Rate
-        self.learning_rate = 1e-1
+        self.learning_rate = 1e-2
 
         # Weights for Hidden Layer to Hidden Layer
         self.WH = np.random.randn(self.hiddenLayers, self.hiddenLayers)
 
         # Initial Hidden State
         self.h = {}
-        self.h[-1] = np.zeros((self.hiddenLayers, 1))
+        self.prev_h = np.zeros((self.hiddenLayers, 1))
 
         # Initial Hidden State for Samples
         self.sample_h = np.zeros((self.hiddenLayers, 1))
@@ -48,6 +48,10 @@ class RNN(object):
         # Reset Memory if Cursor Reached EOF
         if self.cursor >= len(self.data) - 1:
             self.cursor = 0
+
+        # Setup Hidden State
+        self.h = {}
+        self.h[-1] = self.prev_h
 
         # All Predictions
         predictions = []
@@ -113,13 +117,18 @@ class RNN(object):
             # Update Next Hidden State Gradient
             dhn = np.dot(self.WH.T, dhidden_deactivated)
 
-        # Perform Parameter Update (Adagrad)
-        for param, grad, cache in zip([self.WX, self.WH, self.WY, self.bh, self.by],
+        # Perform Parameter Update (Adam)
+        for param, grad, m, v in zip([self.WX, self.WH, self.WY, self.bh, self.by],
                                       [dW, dWh, dW2, dbh, dby],
-                                      [self.CdW, self.CdWh, self.CdW2, self.Cbh, self.Cby]):
-            cache += grad**2
-            param += -self.learning_rate * grad / (np.sqrt(cache) + 1e-7)
+                                      [self.mdW, self.mdWh, self.mdW2, self.mbh, self.mby],
+                                      [self.vdW, self.vdWh, self.vdW2, self.vbh, self.vby]):
+            m = 0.9 * m + (1 - 0.9) * grad
+            v = 0.99 * v + (1 - 0.99) * (grad**2)
+            param += -self.learning_rate * m / (np.sqrt(v) + 1e-7)
 
+        # Set Previous State
+        self.prev_h = self.h[len(input_locations) - 1]
+        
         # Increment Cursor
         self.cursor += self.T
 
@@ -143,7 +152,7 @@ class RNN(object):
             # Move Inputs Through Neural Network
             sample_output, self.sample_h = self.forward_step(sample_input, self.sample_h)
             idx = np.argmax(sample_output)
-            sample += self.vocab[idx]
+            sample += " " + self.vocab[idx]
 
             # Generate new Inputs
             sample_input = np.zeros((self.vocab_size, 1))
@@ -170,7 +179,7 @@ class RNN(object):
 
         # Timesteps to Move through Network
         data_len = len(self.data) - 1
-        self.T = 1 if data_len < 10 else 10
+        self.T = 1 if data_len < 25 else 25
 
         # Initialize Weights
         self.WX = np.random.randn(self.hiddenLayers, self.vocab_size) # Input to Hidden
@@ -181,11 +190,17 @@ class RNN(object):
         self.by = np.zeros((self.vocab_size, 1)) # Output Layer
 
         # Initialize Gradient Cache
-        self.CdW = np.zeros_like(self.WX)
-        self.CdWh = np.zeros_like(self.WH)
-        self.CdW2 = np.zeros_like(self.WY)
-        self.Cbh = np.zeros_like(self.bh)
-        self.Cby = np.zeros_like(self.by)
+        self.mdW = np.zeros_like(self.WX)
+        self.mdWh = np.zeros_like(self.WH)
+        self.mdW2 = np.zeros_like(self.WY)
+        self.mbh = np.zeros_like(self.bh)
+        self.mby = np.zeros_like(self.by)
+
+        self.vdW = np.zeros_like(self.WX)
+        self.vdWh = np.zeros_like(self.WH)
+        self.vdW2 = np.zeros_like(self.WY)
+        self.vbh = np.zeros_like(self.bh)
+        self.vby = np.zeros_like(self.by)
 
     def save(self):
         pickle.dump(self, open("rnn_dump", "w+"))
@@ -202,7 +217,7 @@ class RNN(object):
                 print self.sample()
                 print log
 
-iterations = 10000
+iterations = 1000
 bot = RNN()
 try:
     try:
