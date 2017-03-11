@@ -23,9 +23,6 @@ class RNN(object):
         self.h = {}
         self.prev_h = np.zeros((self.hiddenLayers, 1))
 
-        # Initial Hidden State for Samples
-        self.sample_h = np.zeros((self.hiddenLayers, 1))
-
         # Internal Cursor
         self.cursor = 0
 
@@ -128,7 +125,7 @@ class RNN(object):
 
         # Set Previous State
         self.prev_h = self.h[len(input_locations) - 1]
-        
+
         # Increment Cursor
         self.cursor += self.T
 
@@ -142,18 +139,20 @@ class RNN(object):
         seed = self.gram_to_vocab[self.data[self.cursor]]
 
         # Populate Sample with Seed
-        sample += self.data[self.cursor]
+        sample += self.vocab[seed]
 
         # Generate sample input
         sample_input = np.zeros((self.vocab_size, 1))
         sample_input[seed, 0] = 1
 
+        # Internal State for Sample
+        sample_h = np.copy(self.prev_h)
+
         for i in xrange(n):
             # Move Inputs Through Neural Network
-            sample_output, self.sample_h = self.forward_step(sample_input, self.sample_h)
+            sample_output, sample_h = self.forward_step(sample_input, sample_h)
             idx = np.argmax(sample_output)
             sample += " " + self.vocab[idx]
-
             # Generate new Inputs
             sample_input = np.zeros((self.vocab_size, 1))
             sample_input[idx, 0] = 1
