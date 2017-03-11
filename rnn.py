@@ -122,7 +122,7 @@ class RNN(object):
 
             # Generate new Inputs
             sample_input = np.zeros((self.vocab_size, 1))
-            sample_input[idx] = 1
+            sample_input[idx, 0] = 1
 
         return sample
 
