@@ -41,7 +41,12 @@ class RNN(object):
         return self.softmax(np.dot(self.WY, prev_h)), h
 
     def step(self):
+        # Total Loss
         loss = 0
+
+        # Reset Memory if Cursor Reached EOF
+        if self.cursor >= len(self.data):
+            self.cursor = 0
 
         # Generate Inputs
         input_locations = [self.gram_to_vocab[gram] for gram in self.data[self.cursor:self.cursor+self.T]]
@@ -68,7 +73,6 @@ class RNN(object):
 
         self.cursor += self.T
 
-
         return loss
 
     def train(self, data, ngrams=7):
@@ -89,7 +93,7 @@ class RNN(object):
 
         # Timesteps to Move through Network
         data_len = len(self.data) - 1
-        self.T = data_len if data_len < 1 else 10
+        self.T = 1 if data_len < 10 else 10
 
         # Initialize Weights
         self.WX = np.random.randn(self.hiddenLayers, self.vocab_size) # Input to Hidden
