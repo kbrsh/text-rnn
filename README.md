@@ -4,8 +4,9 @@ RNN to generate text from chunks of text
 ### Todo
 
 - [x] Sampling
-- [ ] Forward Propagation
-  - [ ] Compute Hidden State
+- [x] Forward Propagation
+  - [x] Compute Hidden State
+  - [x] Compute Loss
 - [ ] Backwards Propagation
   - [ ] Compute Gradients
     - [ ] Clip Gradients (to prevent exploding gradients)
