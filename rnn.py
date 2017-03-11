@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 
 def unique(seq):
     seen = set()
@@ -124,6 +125,32 @@ class RNN(object):
 
         return loss
 
+    def sample(self, n=100):
+        # Sample
+        sample = ""
+
+        # Seed (Start Letter)
+        seed = self.gram_to_vocab[self.data[self.cursor]]
+
+        # Populate Sample with Seed
+        sample += self.data[self.cursor]
+
+        # Generate sample input
+        sample_input = np.zeros((self.vocab_size, 1))
+        sample_input[seed, 0] = 1
+
+        for i in xrange(n):
+            # Move Inputs Through Neural Network
+            sample_output, self.sample_h = self.forward_step(sample_input, self.sample_h)
+            idx = np.argmax(sample_output)
+            sample += self.vocab[idx]
+
+            # Generate new Inputs
+            sample_input = np.zeros((self.vocab_size, 1))
+            sample_input[idx, 0] = 1
+
+        return sample
+
     def train(self, data, ngrams=7):
         # Split Data by ngrams
         self.data = [data[i:i+ngrams] for i in range(0, len(data), ngrams)]
@@ -159,40 +186,32 @@ class RNN(object):
         self.Cbh = np.zeros_like(self.bh)
         self.Cby = np.zeros_like(self.by)
 
+    def save(self):
+        pickle.dump(self, open("rnn_dump", "w+"))
 
-    def sample(self, n=100):
-        # Sample
-        sample = ""
+    def load(self, dump):
+        return pickle.load(dump)
 
-        # Seed (Start Letter)
-        seed = self.gram_to_vocab[self.data[self.cursor]]
-
-        # Populate Sample with Seed
-        sample += self.data[self.cursor]
-
-        # Generate sample input
-        sample_input = np.zeros((self.vocab_size, 1))
-        sample_input[seed, 0] = 1
-
-        for i in xrange(n):
-            # Move Inputs Through Neural Network
-            sample_output, self.sample_h = self.forward_step(sample_input, self.sample_h)
-            idx = np.argmax(sample_output)
-            sample += self.vocab[idx]
-
-            # Generate new Inputs
-            sample_input = np.zeros((self.vocab_size, 1))
-            sample_input[idx, 0] = 1
-
-        return sample
+    def run(self, iterations):
+        for i in xrange(iterations):
+            loss = self.step()
+            if(i % 10 == 0):
+                log = '======= Iteration: ' + str(i) + '  Loss: ' + str(loss) + ' ======='
+                print '=' * len(log)
+                print self.sample()
+                print log
 
 iterations = 10000
 bot = RNN()
-bot.train(open("data.txt").read())
-for i in xrange(iterations):
-    loss = bot.step()
-    if(i % 10 == 0):
-        log = '======= Iteration: ' + str(i) + '  Loss: ' + str(loss) + ' ======='
-        print '=' * len(log)
-        print bot.sample()
-        print log
+try:
+    try:
+        dump = open("rnn_dump")
+        bot = bot.load(dump)
+    except:
+        bot.train(open("data.txt").read())
+    finally:
+        bot.run(iterations)
+except:
+    print '======= Saving Data To "rnn_dump" ======='
+    bot.save()
+    pass
