@@ -7,11 +7,10 @@ RNN to generate text from chunks of text
 - [x] Forward Propagation
   - [x] Compute Hidden State
   - [x] Compute Loss
-- [ ] Backwards Propagation
-  - [ ] Compute Gradients
-    - [ ] Clip Gradients (to prevent exploding gradients)
-  - [ ] Data Regularization
-  - [ ] Adagrad Optimized Parameter Update
+- [ ] Back Propagation
+  - [x] Compute Gradients
+  - [ ] Clip Gradients (to prevent exploding gradients)
+  - [x] Adagrad Optimized Parameter Update
 
 ### License
 
