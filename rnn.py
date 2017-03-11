@@ -153,7 +153,8 @@ class RNN(object):
 
     def train(self, data, ngrams=7):
         # Split Data by ngrams
-        self.data = [data[i:i+ngrams] for i in range(0, len(data), ngrams)]
+        words = data.split(" ")
+        self.data = [" ".join(words[i:i+ngrams]) for i in range(len(words))[::ngrams]]
 
         # Get Unique Data
         self.unique_data = unique(self.data)
