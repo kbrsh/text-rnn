@@ -10,7 +10,7 @@ RNN to generate text from chunks of text
 - [ ] Back Propagation
   - [x] Compute Gradients
   - [ ] Clip Gradients (to prevent exploding gradients)
-  - [x] Adagrad Optimized Parameter Update
+  - [x] Adam Optimized Parameter Update
 
 ### License
 
