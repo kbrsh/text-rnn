@@ -36,9 +36,9 @@ class RNN(object):
 
     def forward_step(self, X, prev_h):
         # Compute hidden state
-        h = np.tanh(np.dot(self.WX, X) + np.dot(self.WH, prev_h))
+        h = np.tanh(np.dot(self.WX, X) + np.dot(self.WH, prev_h) + self.bh)
         # Compute output
-        return self.softmax(np.dot(self.WY, h)), h
+        return self.softmax(np.dot(self.WY, h) + self.by), h
 
     def step(self):
         # Total Loss
@@ -83,6 +83,10 @@ class RNN(object):
         dW2 = np.zeros_like(self.WY)
         dWh = np.zeros_like(self.WH)
         dW = np.zeros_like(self.WX)
+
+        dbh = np.zeros_like(self.bh)
+        dby = np.zeros_like(self.by)
+
         dhn = np.zeros_like(self.h[0])
         for i in reversed(xrange(len(input_locations))):
             d_outputs = np.copy(predictions[i])
@@ -91,10 +95,16 @@ class RNN(object):
             # Compute Gradient for Output Layer
             dW2 += np.dot(d_outputs, self.h[i].T)
 
+            # Compute Gradient for Output Bias
+            dby += np.sum(d_outputs, axis=0, keepdims=True)
+
             # Compute Gradient for Hidden Layer
             dhidden = np.dot(self.WY.T, d_outputs) + dhn
             dhidden_deactivated = (1 - self.h[i] * self.h[i]) * dhidden
             dWh += np.dot(dhidden_deactivated, self.h[i - 1].T)
+
+            # Compute Gradient for Hidden Bias
+            dbh += np.sum(dhidden_deactivated, axis=0, keepdims=True)
 
             # Compute Gradient for Input Layer
             dW += np.dot(dhidden_deactivated, all_inputs[i].T)
@@ -102,10 +112,10 @@ class RNN(object):
             # Update Next Hidden State Gradient
             dhn = np.dot(self.WH.T, dhidden_deactivated)
 
-        # Perform Parameter Update
-        for param, grad, cache in zip([self.WX, self.WH, self.WY],
-                                      [dW, dWh, dW2],
-                                      [self.CdW, self.CdWh, self.CdW2]):
+        # Perform Parameter Update (Adagrad)
+        for param, grad, cache in zip([self.WX, self.WH, self.WY, self.bh, self.by],
+                                      [dW, dWh, dW2, dbh, dby],
+                                      [self.CdW, self.CdWh, self.CdW2, self.Cbh, self.Cby]):
             cache += grad**2
             param += -self.learning_rate * grad / (np.sqrt(cache) + 1e-7)
 
@@ -138,10 +148,16 @@ class RNN(object):
         self.WX = np.random.randn(self.hiddenLayers, self.vocab_size) # Input to Hidden
         self.WY = np.random.randn(self.vocab_size, self.hiddenLayers) # Hidden to Output
 
+        # Initialize Bias
+        self.bh = np.zeros((self.hiddenLayers, 1)) # Hidden Layer
+        self.by = np.zeros((self.vocab_size, 1)) # Output Layer
+
         # Initialize Gradient Cache
         self.CdW = np.zeros_like(self.WX)
         self.CdWh = np.zeros_like(self.WH)
         self.CdW2 = np.zeros_like(self.WY)
+        self.Cbh = np.zeros_like(self.bh)
+        self.Cby = np.zeros_like(self.by)
 
 
     def sample(self, n=100):
@@ -172,10 +188,10 @@ class RNN(object):
 
 iterations = 10000
 bot = RNN()
-bot.train(open("data.txt").read(), 1)
+bot.train(open("data.txt").read())
 for i in xrange(iterations):
     loss = bot.step()
-    if(i % 100 == 0):
+    if(i % 10 == 0):
         log = '======= Iteration: ' + str(i) + '  Loss: ' + str(loss) + ' ======='
         print '=' * len(log)
         print bot.sample()
