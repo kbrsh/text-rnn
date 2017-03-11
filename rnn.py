@@ -42,6 +42,33 @@ class RNN(object):
 
     def step(self):
         loss = 0
+
+        # Generate Inputs
+        input_locations = [self.gram_to_vocab[gram] for gram in self.data[self.cursor:self.cursor+self.T]]
+
+        # Forward Propagation
+        for i in xrange(len(input_locations)):
+            # Get Location of Input and Output
+            input_location = input_locations[i]
+            output_location = input_locations[i] + 1
+
+            # Generate Input
+            inputs = np.zeros((self.vocab_size, 1))
+            inputs[input_location, 0] = 1
+
+            # Generate Output
+            outputs = np.zeros((self.vocab_size, 1))
+            outputs[output_location, 0] = 1
+
+            # Move Input through Neural Network
+            prediction, self.h[i] = self.forward_step(inputs, self.h[i - 1])
+
+            # Calculate Loss
+            loss += self.loss(prediction, output_location)
+
+        self.cursor += self.T
+
+
         return loss
 
     def train(self, data, ngrams=7):
@@ -62,7 +89,7 @@ class RNN(object):
 
         # Timesteps to Move through Network
         data_len = len(self.data) - 1
-        self.T = data_len if data_len < 10 else 10
+        self.T = data_len if data_len < 1 else 10
 
         # Initialize Weights
         self.WX = np.random.randn(self.hiddenLayers, self.vocab_size) # Input to Hidden
