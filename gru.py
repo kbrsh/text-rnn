@@ -14,7 +14,7 @@ def softmax(x, temperature=1.0):
     return exp_x / np.sum(exp_x)
 
 class TextRNN(object):
-    def __init__(self, hiddenLayers=100, sequenceLength=100):
+    def __init__(self, hiddenLayers=300, sequenceLength=100):
         # Hidden Layers
         self.hiddenLayers = hiddenLayers
 
@@ -79,6 +79,12 @@ class TextRNN(object):
         self.WHR = np.random.randn(self.hiddenLayers, self.hiddenLayers) * 0.1 # Reset Gate
         self.WHC = np.random.randn(self.hiddenLayers, self.hiddenLayers) * 0.1 # Candidate Gate
 
+        # Biases
+        self.bC = np.zeros((self.hiddenLayers, 1)) # Candidate Gate
+        self.bR = np.zeros((self.hiddenLayers, 1)) # Reset Gate
+        self.bZ = np.zeros((self.hiddenLayers, 1)) # Update Gate
+        self.bY = np.zeros((self.vocabSize, 1)) # Output
+
         # Output Layer Weights
         self.WY = np.random.randn(self.vocabSize, self.hiddenLayers) * 0.1
 
@@ -91,6 +97,10 @@ class TextRNN(object):
         self.dHRM = np.zeros_like(self.WHR)
         self.dHCM = np.zeros_like(self.WHC)
 
+        self.dbZM = np.zeros_like(self.bZ)
+        self.dbRM = np.zeros_like(self.bR)
+        self.dbCM = np.zeros_like(self.bC)
+
         self.dYM = np.zeros_like(self.WY)
 
         self.dXZV = np.zeros_like(self.WXZ)
@@ -101,27 +111,33 @@ class TextRNN(object):
         self.dHRV = np.zeros_like(self.WHR)
         self.dHCV = np.zeros_like(self.WHC)
 
+        self.dbZV = np.zeros_like(self.bZ)
+        self.dbRV = np.zeros_like(self.bR)
+        self.dbCV = np.zeros_like(self.bC)
+
         self.dYV = np.zeros_like(self.WY)
 
 
     def forward(self, X, hPrev, temperature=1.0):
         # Update Gate
-        zbar = np.dot(self.WXZ, X) + np.dot(self.WHZ, hPrev)
+        zbar = np.dot(self.WXZ, X) + np.dot(self.WHZ, hPrev) + self.bZ
         z = sigmoid(zbar)
 
         # Reset Gate
-        rbar = np.dot(self.WXR, X) + np.dot(self.WHR, hPrev)
+        rbar = np.dot(self.WXR, X) + np.dot(self.WHR, hPrev) + self.bR
         r = sigmoid(rbar)
 
         # Candidate
-        cbar = np.dot(self.WXC, X) + np.dot(self.WHC, np.multiply(r, hPrev))
+        cbar = np.dot(self.WXC, X) + np.dot(self.WHC, np.multiply(r, hPrev)) + self.bC
         c = np.tanh(cbar)
 
         # Hidden State
-        h = np.multiply(c, z) + np.multiply(hPrev, (1 - z))
+        h = np.multiply(c, z) + np.multiply(hPrev, 1 - z)
+        # h = np.multiply(z, hPrev) + np.multiply((1 - z), c)
+
 
         # Output
-        o = softmax(np.dot(self.WY, h), temperature)
+        o = softmax(np.dot(self.WY, h) + self.bY, temperature)
 
         return z, zbar, r, rbar, c, cbar, h, o
 
@@ -183,6 +199,11 @@ class TextRNN(object):
         dHR = np.zeros_like(self.WHR)
         dHC = np.zeros_like(self.WHC)
 
+        dbZ = np.zeros_like(self.bZ)
+        dbR = np.zeros_like(self.bR)
+        dbC = np.zeros_like(self.bC)
+        dbY = np.zeros_like(self.bY)
+
         dY = np.zeros_like(self.WY)
 
         dhnext = np.zeros_like(self.h[0])
@@ -198,13 +219,14 @@ class TextRNN(object):
             dSY = np.copy(o[i])
             dSY[targets[i]] -= 1
             dY += np.dot(dSY, self.h[i].T)
+            dbY += dSY
 
             # Back Propagate Through H and X
-            dha = np.multiply(dhnext, 1 - z[i + 1])
-            dhb = np.dot(self.WHR.T, drbarnext)
-            dhc = np.dot(self.WHZ.T, dzbarnext)
-            dhd = np.multiply(r[i + 1], np.dot(self.WHC.T, dcbarnext))
-            dhe = np.dot(self.WY.T, dSY)
+            dha = np.multiply(dhnext, 1 - z[i + 1]) # Through Update Gate
+            dhb = np.dot(self.WHR.T, drbarnext) # Weights into rbar
+            dhc = np.dot(self.WHZ.T, dzbarnext) # Weights into zbar
+            dhd = np.multiply(r[i + 1], np.dot(self.WHC.T, dcbarnext)) # Weights into cbar
+            dhe = np.dot(self.WY.T, dSY) # Weights at output
 
             dh = dha + dhb + dhc + dhd + dhe
 
@@ -220,6 +242,10 @@ class TextRNN(object):
             dHR += np.dot(drbar, self.h[i - 1].T)
             dHC += np.dot(dcbar, np.multiply(r[i], self.h[i - 1]).T)
 
+            dbZ += dzbar
+            dbR += drbar
+            dbC += dcbar
+
             dhnext = dh
             drbarnext = drbar
             dzbarnext = dzbar
@@ -227,10 +253,10 @@ class TextRNN(object):
 
 
         # Parameter Update (Adam)
-        for param, delta, m, v in zip([self.WXZ,   self.WXR,  self.WXC,  self.WHZ,  self.WHR,  self.WHC,  self.WY],
-                                      [dXZ,        dXR,       dXC,       dHZ,       dHR,       dHC,       dY],
-                                      [self.dXZM,  self.dXRM, self.dXCM, self.dHZM, self.dHRM, self.dHCM, self.dYM],
-                                      [self.dXZV,  self.dXRV, self.dXCV, self.dHZV, self.dHRV, self.dHCV, self.dYV]):
+        for param, delta, m, v in zip([self.WXZ,   self.WXR,  self.WXC,  self.WHZ,  self.WHR,  self.WHC,  self.WY,  self.bZ,   self.bR,  self.bC],
+                                      [dXZ,        dXR,       dXC,       dHZ,       dHR,       dHC,       dY,       dbZ,       dbR,      dbC],
+                                      [self.dXZM,  self.dXRM, self.dXCM, self.dHZM, self.dHRM, self.dHCM, self.dYM, self.dbZM, self.dbRM, self.dbCM],
+                                      [self.dXZV,  self.dXRV, self.dXCV, self.dHZV, self.dHRV, self.dHCV, self.dYV, self.dbZV, self.dbRV, self.dbCV]):
             m = 0.9 * m + 0.1 * delta
             v = 0.99 * v + 0.01 * (delta ** 2)
             param += -self.learningRate * m / (np.sqrt(v) + 1e-8)
@@ -286,25 +312,26 @@ class TextRNN(object):
 
         return output
 
-    def run(self, epochs=100, iterations=100, size=100, temperatures=[1.0], sampleFile=False):
-        if(sampleFile != False):
+    def run(self, iterations=1000, size=100, temperatures=[1.0], sampleFile=False, printSample=5):
+        if sampleFile != False:
             sampleFile = open(sampleFile, 'w')
 
-        for i in xrange(epochs):
-            for j in xrange(iterations):
-                loss = bot.step()
-            for temperature in temperatures:
-                print '======= Temperature: ' + str(temperature) + ' ======='
-                sample = bot.sample(size, temperature)
-                print sample
-                if(sampleFile != False):
-                    sampleFile.write(sample + '\n\n\n')
+        for i in xrange(iterations):
+            loss = bot.step()
+            if i % printSample == 0:
+                for temperature in temperatures:
+                    print '======= Temperature: ' + str(temperature) + ' ======='
+                    sample = bot.sample(size, temperature)
+                    print sample
+                    if(sampleFile != False):
+                        sampleFile.write(sample + '\n\n\n')
 
             print '\n'
-            print '======= Epoch ' + str(i + 1) + ' ======='
+            print '======= Iteration ' + str(i + 1) + ' ======='
             print '======= Loss: ' + str(loss) + ' ======='
 
-        sampleFile.close()
+        if sampleFile != False:
+            sampleFile.close()
 
     def save(self, small=True):
         savedObj = {item:value for item, value in self.__dict__.iteritems()}
@@ -313,7 +340,7 @@ class TextRNN(object):
             for param in ["data", "uniqueData", "indexToGram", "gramToIndex", "inputs", "outputs"]:
                 del savedObj[param]
 
-        pickle.dump(savedObj, open("TEXT_RNN_DUMP", "w+"))
+        pickle.dump(savedObj, open("TEXT_RNN_DUMP2", "w+"))
 
     def load(self, dump):
         newSelf = pickle.load(dump)
@@ -321,7 +348,8 @@ class TextRNN(object):
             setattr(self, item, value)
 
 
-bot = TextRNN(sequenceLength=10)
-bot.train(open('data.txt').read(), 1, '')
-bot.run(epochs=100, iterations=5, size=150, temperatures=[0.7, 1.0], sampleFile="samples.txt")
+bot = TextRNN()
+bot.train(open('data.txt').read(), 1)
+# bot.load()
+bot.run()
 bot.save(True)
