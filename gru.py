@@ -286,25 +286,42 @@ class TextRNN(object):
 
         return output
 
-    def run(self, epochs=100, iterations=100, size=100, temperatures=[1.0]):
+    def run(self, epochs=100, iterations=100, size=100, temperatures=[1.0], sampleFile=False):
+        if(sampleFile != False):
+            sampleFile = open(sampleFile, 'w')
+
         for i in xrange(epochs):
             for j in xrange(iterations):
                 loss = bot.step()
             for temperature in temperatures:
                 print '======= Temperature: ' + str(temperature) + ' ======='
-                print bot.sample(size, temperature)
+                sample = bot.sample(size, temperature)
+                print sample
+                if(sampleFile != False):
+                    sampleFile.write(sample + '\n\n\n')
 
             print '\n'
             print '======= Epoch ' + str(i + 1) + ' ======='
             print '======= Loss: ' + str(loss) + ' ======='
 
-    def save(self):
-        pickle.dump(self, open("TEXT_RNN_DUMP", "w+"))
+        sampleFile.close()
+
+    def save(self, small=True):
+        savedObj = {item:value for item, value in self.__dict__.iteritems()}
+
+        if small == True:
+            for param in ["data", "uniqueData", "indexToGram", "gramToIndex", "inputs", "outputs"]:
+                del savedObj[param]
+
+        pickle.dump(savedObj, open("TEXT_RNN_DUMP", "w+"))
 
     def load(self, dump):
-        return pickle.load(dump)
+        newSelf = pickle.load(dump)
+        for item, value in newSelf.iteritems():
+            setattr(self, item, value)
 
 
-bot = TextRNN()
-bot.train(open('data.txt').read(), 1)
-bot.run(epochs=100, iterations=1, temperatures=[0.7, 1.0])
+bot = TextRNN(sequenceLength=10)
+bot.train(open('data.txt').read(), 1, '')
+bot.run(epochs=100, iterations=5, size=150, temperatures=[0.7, 1.0], sampleFile="samples.txt")
+bot.save(True)
