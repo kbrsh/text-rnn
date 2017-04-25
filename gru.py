@@ -14,12 +14,12 @@ def softmax(x, temperature=1.0):
     return exp_x / np.sum(exp_x)
 
 class TextRNN(object):
-    def __init__(self, hiddenLayers=75, sequenceLength=100):
+    def __init__(self, hiddenLayers=100, sequenceLength=100):
         # Hidden Layers
         self.hiddenLayers = hiddenLayers
 
         # Learning Rate
-        self.learningRate = 1e-2
+        self.learningRate = 1e-3
 
         # Hidden State
         self.h = {}
@@ -152,7 +152,7 @@ class TextRNN(object):
         targets = {}
 
         # Timesteps to Unroll
-        totalLen = self.vocabSize - 1
+        totalLen = len(self.inputs)
         if self.cursor + self.sequenceLength > totalLen:
             self.cursor = 0
 
@@ -226,7 +226,7 @@ class TextRNN(object):
             dcbarnext = dcbar
 
 
-        # # Parameter Update (Adam)
+        # Parameter Update (Adam)
         for param, delta, m, v in zip([self.WXZ,   self.WXR,  self.WXC,  self.WHZ,  self.WHR,  self.WHC,  self.WY],
                                       [dXZ,        dXR,       dXC,       dHZ,       dHR,       dHC,       dY],
                                       [self.dXZM,  self.dXRM, self.dXCM, self.dHZM, self.dHRM, self.dHCM, self.dYM],
@@ -259,11 +259,14 @@ class TextRNN(object):
         cbar = {}
 
         # Make inputs from seed
+        lastTrained = self.cursor - self.sequenceLength
+        seedIdx = lastTrained if lastTrained >= 0 else 0
+        seed = self.data[seedIdx]
         X = np.zeros((self.vocabSize, 1))
-        X[self.cursor, 0] = 1
+        X[self.gramToIndex[seed], 0] = 1
 
         # Add seed to output
-        output += self.indexToGram[self.cursor]
+        output += seed
 
         # Generate sample
         for i in xrange(num - 1):
@@ -283,7 +286,7 @@ class TextRNN(object):
 
         return output
 
-    def run(self, epochs=10, iterations=100, size=100, temperatures=[1.0]):
+    def run(self, epochs=100, iterations=100, size=100, temperatures=[1.0]):
         for i in xrange(epochs):
             for j in xrange(iterations):
                 loss = bot.step()
@@ -291,9 +294,9 @@ class TextRNN(object):
                 print '======= Temperature: ' + str(temperature) + ' ======='
                 print bot.sample(size, temperature)
 
+            print '\n'
             print '======= Epoch ' + str(i + 1) + ' ======='
             print '======= Loss: ' + str(loss) + ' ======='
-            print '\n'
 
     def save(self):
         pickle.dump(self, open("TEXT_RNN_DUMP", "w+"))
@@ -304,4 +307,4 @@ class TextRNN(object):
 
 bot = TextRNN()
 bot.train(open('data.txt').read(), 1)
-bot.run(epochs=1000, iterations=1, size=50, temperatures=[0.7, 1.0])
+bot.run(epochs=100, iterations=1, temperatures=[0.7, 1.0])
