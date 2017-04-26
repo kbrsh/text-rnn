@@ -326,9 +326,10 @@ class TextRNN(object):
                     if(sampleFile != False):
                         sampleFile.write(sample + '\n\n\n')
 
-            print '\n'
-            print '======= Iteration ' + str(i + 1) + ' ======='
-            print '======= Loss: ' + str(loss) + ' ======='
+                print '\n'
+                print '======= Iteration ' + str(i + 1) + ' ======='
+                print '======= Samples Seen: ' + str(self.cursor) + ' ======='
+                print '======= Loss: ' + str(loss) + ' ======='
 
         if sampleFile != False:
             sampleFile.close()
@@ -340,16 +341,16 @@ class TextRNN(object):
             for param in ["data", "uniqueData", "indexToGram", "gramToIndex", "inputs", "outputs"]:
                 del savedObj[param]
 
-        pickle.dump(savedObj, open("TEXT_RNN_DUMP2", "w+"))
+        pickle.dump(savedObj, open("TEXT_RNN_DUMP", "w+"))
 
     def load(self, dump):
         newSelf = pickle.load(dump)
         for item, value in newSelf.iteritems():
             setattr(self, item, value)
 
-
+data = open('data.txt').read()
 bot = TextRNN()
-bot.train(open('data.txt').read(), 1)
-# bot.load()
+bot.train(data, 1, '')
+# bot.load(open('TEXT_RNN_DUMP'))
 bot.run()
 bot.save(True)
