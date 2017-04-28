@@ -19,7 +19,7 @@ class TextRNN(object):
         self.hiddenLayers = hiddenLayers
 
         # Learning Rate
-        self.learningRate = 1e-3
+        self.learningRate = 2e-3
 
         # Hidden State
         self.h = {}
@@ -267,7 +267,7 @@ class TextRNN(object):
         return loss
 
 
-    def sample(self, num=100, temperature=1.0):
+    def sample(self, num=100, temperature=1.0, start=False):
         # Output
         output = ""
 
@@ -275,19 +275,27 @@ class TextRNN(object):
         h = {}
         h[-1] = np.zeros((self.hiddenLayers, 1))
 
+        # Sample Update Gate
         z = {}
         zbar = {}
 
+        # Sample Reset Gate
         r = {}
         rbar = {}
 
+        # Sample Candidate Gate
         c = {}
         cbar = {}
 
         # Make inputs from seed
-        lastTrained = self.cursor - self.sequenceLength
-        seedIdx = lastTrained if lastTrained >= 0 else 0
-        seed = self.data[seedIdx]
+        if start == False:
+            lastCursor = self.cursor - self.sequenceLength
+            seedIdx = lastCursor if lastCursor >= 0 else 0
+            seed = self.data[seedIdx]
+        else:
+            seedIdx = self.gramToIndex[start]
+            seed = start
+
         X = np.zeros((self.vocabSize, 1))
         X[self.gramToIndex[seed], 0] = 1
 
@@ -312,16 +320,15 @@ class TextRNN(object):
 
         return output
 
-    def run(self, iterations=1000, size=100, temperatures=[1.0], sampleFile=False, printSample=5):
+    def run(self, iterations=1000, size=100, temperatures=[1.0], sampleFile=False, printSample=5, seed=False):
         if sampleFile != False:
             sampleFile = open(sampleFile, 'w')
-
         for i in xrange(iterations):
             loss = bot.step()
             if i % printSample == 0:
                 for temperature in temperatures:
                     print '======= Temperature: ' + str(temperature) + ' ======='
-                    sample = bot.sample(size, temperature)
+                    sample = bot.sample(size, temperature, seed)
                     print sample
                     if(sampleFile != False):
                         sampleFile.write(sample + '\n\n\n')
@@ -341,16 +348,15 @@ class TextRNN(object):
             for param in ["data", "uniqueData", "indexToGram", "gramToIndex", "inputs", "outputs"]:
                 del savedObj[param]
 
-        pickle.dump(savedObj, open("TEXT_RNN_DUMP", "w+"))
+        pickle.dump(savedObj, open("TEXT_RNN_DUMP3", "w+"))
 
     def load(self, dump):
         newSelf = pickle.load(dump)
         for item, value in newSelf.iteritems():
             setattr(self, item, value)
 
-data = open('data.txt').read()
+data = open('data.txt').read().lower()
 bot = TextRNN()
 bot.train(data, 1, '')
-# bot.load(open('TEXT_RNN_DUMP'))
 bot.run()
 bot.save(True)
